@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# 🚀 Flugo - Desafio Frontend (React & Firebase)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este é o repositório referente ao desafio técnico para a vaga de Desenvolvedor(a) React. A aplicação consiste em um sistema de cadastro de funcionários com um formulário multi-step e listagem dinâmica de colaboradores.
 
-Currently, two official plugins are available:
+## 🛠️ Tecnologias e Decisões de Arquitetura
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Para garantir um código limpo (Clean Code), escalável e de fácil manutenção, optei por utilizar as seguintes tecnologias:
 
-## React Compiler
+* **Vite + ReactJS + TypeScript:** Base do projeto, garantindo tipagem estática, segurança no desenvolvimento e um build extremamente rápido.
+* **Material UI (MUI):** Utilizado para a criação da interface visual seguindo o conceito de Pixel Perfect em relação ao Figma. O Tema foi customizado para refletir a identidade visual da Flugo.
+* **React Hook Form + Zod:** Utilizados em conjunto no formulário multi-step. Essa abordagem evita o excesso de re-renderizações (comparado a múltiplos `useStates`) e centraliza a lógica de validação de todos os "steps" em um único Schema robusto.
+* **Firebase (Firestore):** Banco de dados NoSQL utilizado para a persistência dos dados. A comunicação com o Firebase foi isolada em uma camada de serviço (Repository Pattern) na pasta `/services`, evitando que a lógica de negócio se misture com os componentes de UI.
+* **React Router Dom:** Gerenciamento das rotas da aplicação, utilizando um `<Layout />` base para evitar a repetição da Sidebar em múltiplas telas.
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+## ⚙️ Como rodar o projeto localmente
 
-## Expanding the ESLint configuration
+Siga o passo a passo abaixo para executar a aplicação na sua máquina:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**1. Clone o repositório**
+\`\`\`bash
+git clone https://github.com/SEU_USUARIO/flugo-challenge.git
+\`\`\`
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**2. Acesse a pasta do projeto**
+\`\`\`bash
+cd flugo-challenge
+\`\`\`
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+**3. Instale as dependências**
+\`\`\`bash
+npm install
+\`\`\`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+**4. Execute o projeto em modo de desenvolvimento**
+\`\`\`bash
+npm run dev
+\`\`\`
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+**5. Acesse no navegador**
+Abra o link \`http://localhost:5173\` (ou a porta informada no terminal).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+Desenvolvido por Gabriel.
