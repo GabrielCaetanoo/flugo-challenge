@@ -5,9 +5,10 @@ import { useForm, FormProvider, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { createEmployee } from '../../services/employeeService';
+import CheckIcon from '@mui/icons-material/Check';
 
-// 1. Schema de validação com Zod
+import { createEmployee, checkEmailExists } from '../../services/employeeService';
+
 const employeeSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('Digite um e-mail válido'),
@@ -17,168 +18,176 @@ const employeeSchema = z.object({
 
 type EmployeeFormData = z.infer<typeof employeeSchema>;
 
+const customInputStyle = {
+  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#20C975' },
+  '& .MuiInputLabel-root.Mui-focused': { color: '#20C975' }
+};
+
 export default function NovoColaborador() {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
 
-  // 2. Configuração do React Hook Form
   const methods = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      isActive: true,
-      department: '',
-    },
+    defaultValues: { name: '', email: '', isActive: true, department: '' },
     mode: 'onChange',
   });
 
-  const { handleSubmit, trigger } = methods;
+  const { handleSubmit, trigger, setError, getValues } = methods;
 
-  // 3. Funções de navegação do Multi-step
   const handleNext = async () => {
     const isStepValid = await trigger(['name', 'email']); 
+    
     if (isStepValid) {
+      const emailAlreadyUsed = await checkEmailExists(getValues('email'));
+      if (emailAlreadyUsed) {
+        setError('email', { type: 'manual', message: 'Este e-mail já está cadastrado no sistema.' });
+        return; 
+      }
       setActiveStep((prev) => prev + 1);
     }
   };
 
-  const handleBack = () => {
-    setActiveStep((prev) => prev - 1);
-  };
+  const handleBack = () => setActiveStep((prev) => prev - 1);
 
-  // 4. Função Final (Salvar no Firebase)
   const onSubmit = async (data: EmployeeFormData) => {
     try {
       await createEmployee(data);
-      // Redireciona para a lista após salvar com sucesso
       navigate('/'); 
     } catch (error) {
-      console.error("Erro ao salvar:", error);
-      alert("Erro ao salvar colaborador. Tente novamente.");
+      console.error(error);
+      alert("Erro ao salvar colaborador.");
     }
   };
 
   const progress = activeStep === 0 ? 0 : 50; 
 
   return (
-    <Box sx={{ maxWidth: 900 }}>
-      {/* Breadcrumbs */}
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Colaboradores • <Typography component="span" color="text.primary">Cadastrar Colaborador</Typography>
+    <Box sx={{ width: '100%', pr: 10 }}> 
+      
+      <Typography variant="body2" sx={{ color: '#94A3B8', mb: 3, fontWeight: 500 }}>
+        Colaboradores <Typography component="span" sx={{ color: '#94A3B8', mx: 1 }}>•</Typography> 
+        <Typography component="span" sx={{ color: '#475569', fontWeight: 600 }}>Cadastrar Colaborador</Typography>
       </Typography>
 
-      {/* Barra de Progresso */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 6 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 6, width: 'calc(100% - 10px)' }}>
         <LinearProgress 
           variant="determinate" 
           value={progress} 
-          sx={{ 
-            flexGrow: 1, 
-            height: 4, 
-            borderRadius: 2, 
-            bgcolor: '#E0E0E0', 
-            '& .MuiLinearProgress-bar': { bgcolor: '#20C975' } 
-          }} 
+          sx={{ flexGrow: 1, height: 4, borderRadius: 2, bgcolor: '#D1FAE5', '& .MuiLinearProgress-bar': { bgcolor: '#20C975' } }} 
         />
-        <Typography variant="body2" color="text.secondary" fontWeight={500}>
-          {progress}%
-        </Typography>
+        <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600, minWidth: '30px' }}>{progress}%</Typography>
       </Box>
 
-      {/* Container Principal */}
       <Box sx={{ display: 'flex', gap: 6 }}>
         
-        {/* Coluna Esquerda: Indicadores */}
-        <Box sx={{ minWidth: 200, display: 'flex', flexDirection: 'column', gap: 4 }}>
-           <Typography color={activeStep === 0 ? '#212121' : '#9E9E9E'} fontWeight={activeStep === 0 ? 'bold' : 'normal'}>
-             1. Infos Básicas
-           </Typography>
-           <Typography color={activeStep === 1 ? '#212121' : '#9E9E9E'} fontWeight={activeStep === 1 ? 'bold' : 'normal'}>
-             2. Infos Profissionais
-           </Typography>
+        <Box sx={{ minWidth: 220, position: 'relative', pt: 0.5 }}>
+          <Box sx={{ position: 'absolute', left: 15, top: 40, height: activeStep === 0 ? 105 : 25, width: '2px', bgcolor: '#E2E8F0', zIndex: 0 }} />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: activeStep === 0 ? 15 : 5, position: 'relative', zIndex: 1 }}>
+            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14,
+                bgcolor: activeStep >= 0 ? '#20C975' : '#E2E8F0', color: activeStep >= 0 ? '#FFFFFF' : '#64748B' }}>
+              {activeStep > 0 ? <CheckIcon sx={{ fontSize: 20 }} /> : '1'}
+            </Box>
+            <Typography sx={{ color: activeStep >= 0 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 0 ? 700 : 500, fontSize: '15px' }}>
+              Infos Básicas
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
+            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14,
+                bgcolor: activeStep >= 1 ? '#20C975' : '#E2E8F0', color: activeStep >= 1 ? '#FFFFFF' : '#64748B' }}>
+              2
+            </Box>
+            <Typography sx={{ color: activeStep >= 1 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 1 ? 700 : 500, fontSize: '15px' }}>
+              Infos Profissionais
+            </Typography>
+          </Box>
         </Box>
 
-        {/* Coluna Direita: O Formulário */}
         <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h5" fontWeight="bold" color="#212121" mb={4}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#475569', mb: 4, fontSize: '24px' }}>
             {activeStep === 0 ? 'Informações Básicas' : 'Informações Profissionais'}
           </Typography>
 
           <FormProvider {...methods}>
             <form onSubmit={handleSubmit(onSubmit)}>
-              
-              {/* PASSO 1: INFORMAÇÕES BÁSICAS */}
-              {activeStep === 0 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 600 }}>
-                  <TextField
-                    label="Título"
-                    placeholder="João da Silva"
-                    variant="outlined"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                    {...methods.register('name')}
-                    error={!!methods.formState.errors.name}
-                    helperText={methods.formState.errors.name?.message}
-                  />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, minHeight: 220 }}>
+                {activeStep === 0 && (
+                  <>
+                    <TextField 
+                      label="Título" 
+                      placeholder="João da Silva" 
+                      variant="outlined" 
+                      fullWidth 
+                      InputLabelProps={{ shrink: true }}
+                      {...methods.register('name')} 
+                      error={!!methods.formState.errors.name} 
+                      helperText={methods.formState.errors.name?.message}
+                      sx={customInputStyle}
+                    />
+                    
+                    <TextField 
+                      label="E-mail" 
+                      placeholder="e.g. john@gmail.com" 
+                      variant="outlined" 
+                      fullWidth 
+                      InputLabelProps={{ shrink: true }}
+                      {...methods.register('email')} 
+                      error={!!methods.formState.errors.email} 
+                      helperText={methods.formState.errors.email?.message}
+                      sx={customInputStyle}
+                    />
+                    
+                    <Controller 
+                      name="isActive" 
+                      control={methods.control} 
+                      render={({ field }) => (
+                        <FormControlLabel 
+                          control={
+                            <Switch 
+                              {...field} 
+                              checked={field.value} 
+                              sx={{ 
+                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#20C975' }, 
+                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#20C975' } 
+                              }} 
+                            />
+                          } 
+                          label={<Typography sx={{ color: '#475569', fontWeight: 500, fontSize: '14px' }}>Ativar ao criar</Typography>} 
+                        />
+                      )}
+                    />
+                  </>
+                )}
 
-                  <TextField
-                    label="E-mail"
-                    placeholder="e.g. john@gmail.com"
-                    variant="outlined"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                    {...methods.register('email')}
-                    error={!!methods.formState.errors.email}
-                    helperText={methods.formState.errors.email?.message}
-                  />
-
-                  <Controller
-                    name="isActive"
-                    control={methods.control}
-                    render={({ field }) => (
-                      <FormControlLabel
-                        control={<Switch {...field} checked={field.value} color="primary" />}
-                        label={<Typography variant="body2" color="#424242" fontWeight={500}>Ativar ao criar</Typography>}
-                      />
-                    )}
-                  />
-                </Box>
-              )}
-
-              {/* PASSO 2: INFORMAÇÕES PROFISSIONAIS */}
-              {activeStep === 1 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 600 }}>
-                  <TextField
-                    select
-                    label="Departamento"
-                    variant="outlined"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
+                {activeStep === 1 && (
+                  <TextField 
+                    select 
+                    label="Departamento" 
+                    variant="outlined" 
+                    fullWidth 
+                    InputLabelProps={{ shrink: true }} 
                     defaultValue=""
-                    {...methods.register('department')}
-                    error={!!methods.formState.errors.department}
+                    {...methods.register('department')} 
+                    error={!!methods.formState.errors.department} 
                     helperText={methods.formState.errors.department?.message}
+                    sx={customInputStyle}
+                    SelectProps={{ MenuProps: { disableScrollLock: true } }} 
                   >
-                    {/* Opção desabilitada para servir como placeholder */}
-                    <MenuItem value="" disabled>
-                      Selecione um departamento
-                    </MenuItem>
+                    <MenuItem value="" disabled>Selecione um departamento</MenuItem>
                     <MenuItem value="Design">Design</MenuItem>
                     <MenuItem value="TI">TI</MenuItem>
                     <MenuItem value="Marketing">Marketing</MenuItem>
                     <MenuItem value="Produto">Produto</MenuItem>
-                    <MenuItem value="Vendas">Vendas</MenuItem>
-                    <MenuItem value="RH">RH</MenuItem>
                   </TextField>
-                </Box>
-              )}
+                )}
+              </Box>
 
-              {/* Botões */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 6 }}>
                 <Button 
                   onClick={activeStep === 0 ? () => navigate('/') : handleBack} 
-                  sx={{ color: '#757575', fontWeight: 'bold' }}
+                  sx={{ color: '#94A3B8', fontWeight: 600, textTransform: 'none', fontSize: '15px' }}
                 >
                   Voltar
                 </Button>
@@ -186,9 +195,9 @@ export default function NovoColaborador() {
                 {activeStep === 0 ? (
                   <Button 
                     variant="contained" 
-                    color="primary" 
                     onClick={handleNext} 
-                    sx={{ fontWeight: 'bold', px: 4, boxShadow: 'none' }}
+                    disableElevation 
+                    sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}
                   >
                     Próximo
                   </Button>
@@ -196,8 +205,8 @@ export default function NovoColaborador() {
                   <Button 
                     type="submit" 
                     variant="contained" 
-                    color="primary" 
-                    sx={{ fontWeight: 'bold', px: 4, boxShadow: 'none' }}
+                    disableElevation 
+                    sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}
                   >
                     Concluir
                   </Button>

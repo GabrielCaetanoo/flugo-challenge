@@ -1,8 +1,7 @@
 // src/services/employeeService.ts
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 
-// A tipagem dos dados baseada no formulário do Figma
 export interface EmployeeData {
   name: string;
   email: string;
@@ -10,10 +9,15 @@ export interface EmployeeData {
   isActive: boolean;
 }
 
-// Referência para a "tabela" (coleção) de funcionários no banco
 const employeesCollectionRef = collection(db, "employees");
 
-// Função para SALVAR um novo colaborador (usaremos no final do multi-step)
+// Verifica se o e-mail já existe no Firebase!
+export const checkEmailExists = async (email: string) => {
+  const q = query(employeesCollectionRef, where("email", "==", email));
+  const querySnapshot = await getDocs(q);
+  return !querySnapshot.empty; // Retorna true se achar algum documento
+};
+
 export const createEmployee = async (data: EmployeeData) => {
   try {
     const docRef = await addDoc(employeesCollectionRef, data);
@@ -24,7 +28,6 @@ export const createEmployee = async (data: EmployeeData) => {
   }
 };
 
-// Função para BUSCAR todos os colaboradores (usaremos na nossa tela de Lista)
 export const getEmployees = async () => {
   try {
     const data = await getDocs(employeesCollectionRef);
