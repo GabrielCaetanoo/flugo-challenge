@@ -1,22 +1,34 @@
 // src/pages/NovoColaborador/index.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Typography, Button, LinearProgress, TextField, FormControlLabel, Switch, MenuItem } from '@mui/material';
-import { useForm, FormProvider, Controller } from 'react-hook-form';
+import { useForm, FormProvider, Controller, useWatch } from 'react-hook-form'; // Adicionado useWatch
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useNavigate } from 'react-router-dom';
 import CheckIcon from '@mui/icons-material/Check';
 
 import { createEmployee, checkEmailExists } from '../../services/employeeService';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 const employeeSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('Digite um e-mail válido'),
   isActive: z.boolean(),
   department: z.string().min(1, 'Selecione um departamento'),
+  cargo: z.string().min(2, 'Informe o cargo'),
+  dataAdmissao: z.string().min(1, 'Informe a data de admissão'),
+  nivel: z.string().min(1, 'Selecione o nível hierárquico'),
+  gestorResponsavel: z.string().optional(),
+  salario: z.string().min(1, 'Informe o salário base'),
 });
 
 type EmployeeFormData = z.infer<typeof employeeSchema>;
+
+interface Gestor {
+  id: string;
+  name: string;
+}
 
 const customInputStyle = {
   '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#20C975' },
@@ -26,14 +38,51 @@ const customInputStyle = {
 export default function NovoColaborador() {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
+  const [gestores, setGestores] = useState<Gestor[]>([]);
 
   const methods = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: { name: '', email: '', isActive: true, department: '' },
+    defaultValues: { 
+      name: '', 
+      email: '', 
+      isActive: true, 
+      department: '',
+      cargo: '',
+      dataAdmissao: '',
+      nivel: '',
+      gestorResponsavel: '',
+      salario: ''
+    },
     mode: 'onChange',
   });
 
-  const { handleSubmit, trigger, setError, getValues } = methods;
+  const { handleSubmit, trigger, setError, getValues, control } = methods;
+  
+  // SOLUÇÃO DO REACT COMPILER: Usando useWatch em vez de watch()
+  const nivelSelecionado = useWatch({
+    control,
+    name: 'nivel',
+    defaultValue: ''
+  });
+
+  useEffect(() => {
+    const fetchGestores = async () => {
+      try {
+        const q = query(collection(db, 'colaboradores'), where('nivel', '==', 'Gestor'));
+        const querySnapshot = await getDocs(q);
+        
+        const lista = querySnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          name: doc.data().name 
+        }));
+        
+        setGestores(lista);
+      } catch (error) {
+        console.error("Erro ao buscar gestores:", error);
+      }
+    };
+    fetchGestores();
+  }, []);
 
   const handleNext = async () => {
     const isStepValid = await trigger(['name', 'email']); 
@@ -162,25 +211,110 @@ export default function NovoColaborador() {
                 )}
 
                 {activeStep === 1 && (
-                  <TextField 
-                    select 
-                    label="Departamento" 
-                    variant="outlined" 
-                    fullWidth 
-                    InputLabelProps={{ shrink: true }} 
-                    defaultValue=""
-                    {...methods.register('department')} 
-                    error={!!methods.formState.errors.department} 
-                    helperText={methods.formState.errors.department?.message}
-                    sx={customInputStyle}
-                    SelectProps={{ MenuProps: { disableScrollLock: true } }} 
-                  >
-                    <MenuItem value="" disabled>Selecione um departamento</MenuItem>
-                    <MenuItem value="Design">Design</MenuItem>
-                    <MenuItem value="TI">TI</MenuItem>
-                    <MenuItem value="Marketing">Marketing</MenuItem>
-                    <MenuItem value="Produto">Produto</MenuItem>
-                  </TextField>
+                  // SOLUÇÃO DO GRID: Usando Box com CSS Grid (100% seguro contra erros de versão do MUI)
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3 }}>
+                    <Box sx={{ gridColumn: 'span 12' }}>
+                      <TextField 
+                        select 
+                        label="Departamento" 
+                        variant="outlined" 
+                        fullWidth 
+                        InputLabelProps={{ shrink: true }} 
+                        defaultValue=""
+                        {...methods.register('department')} 
+                        error={!!methods.formState.errors.department} 
+                        helperText={methods.formState.errors.department?.message}
+                        sx={customInputStyle}
+                        SelectProps={{ MenuProps: { disableScrollLock: true } }} 
+                      >
+                        <MenuItem value="" disabled>Selecione um departamento</MenuItem>
+                        <MenuItem value="Design">Design</MenuItem>
+                        <MenuItem value="TI">TI</MenuItem>
+                        <MenuItem value="Marketing">Marketing</MenuItem>
+                        <MenuItem value="Produto">Produto</MenuItem>
+                      </TextField>
+                    </Box>
+
+                    <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
+                      <TextField 
+                        label="Cargo" 
+                        fullWidth 
+                        InputLabelProps={{ shrink: true }} 
+                        {...methods.register('cargo')} 
+                        error={!!methods.formState.errors.cargo} 
+                        helperText={methods.formState.errors.cargo?.message} 
+                        sx={customInputStyle} 
+                      />
+                    </Box>
+
+                    <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
+                      <TextField 
+                        label="Data de Admissão" 
+                        type="date" 
+                        fullWidth 
+                        InputLabelProps={{ shrink: true }} 
+                        {...methods.register('dataAdmissao')} 
+                        error={!!methods.formState.errors.dataAdmissao} 
+                        helperText={methods.formState.errors.dataAdmissao?.message} 
+                        sx={customInputStyle} 
+                      />
+                    </Box>
+
+                    <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
+                      <TextField 
+                        select 
+                        label="Nível Hierárquico" 
+                        fullWidth 
+                        defaultValue="" 
+                        InputLabelProps={{ shrink: true }} 
+                        {...methods.register('nivel')} 
+                        error={!!methods.formState.errors.nivel} 
+                        helperText={methods.formState.errors.nivel?.message} 
+                        sx={customInputStyle}
+                        SelectProps={{ MenuProps: { disableScrollLock: true } }}
+                      >
+                        <MenuItem value="" disabled>Selecione</MenuItem>
+                        <MenuItem value="Júnior">Júnior</MenuItem>
+                        <MenuItem value="Pleno">Pleno</MenuItem>
+                        <MenuItem value="Sênior">Sênior</MenuItem>
+                        <MenuItem value="Gestor">Gestor</MenuItem>
+                      </TextField>
+                    </Box>
+
+                    <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
+                      <TextField 
+                        select 
+                        label="Gestor Responsável" 
+                        fullWidth 
+                        defaultValue="" 
+                        InputLabelProps={{ shrink: true }} 
+                        {...methods.register('gestorResponsavel')} 
+                        error={!!methods.formState.errors.gestorResponsavel} 
+                        helperText={methods.formState.errors.gestorResponsavel?.message} 
+                        sx={customInputStyle} 
+                        disabled={nivelSelecionado === 'Gestor'}
+                        SelectProps={{ MenuProps: { disableScrollLock: true } }}
+                      >
+                        <MenuItem value=""><em>Nenhum</em></MenuItem>
+                        {gestores.map((gestor) => (
+                          <MenuItem key={gestor.id} value={gestor.id}>{gestor.name}</MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
+
+                    <Box sx={{ gridColumn: 'span 12' }}>
+                      <TextField 
+                        label="Salário Base (R$)" 
+                        type="number" 
+                        fullWidth 
+                        InputLabelProps={{ shrink: true }} 
+                        {...methods.register('salario')} 
+                        error={!!methods.formState.errors.salario} 
+                        helperText={methods.formState.errors.salario?.message} 
+                        sx={customInputStyle} 
+                      />
+                    </Box>
+                  </Box>
                 )}
               </Box>
 
