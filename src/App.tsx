@@ -4,11 +4,13 @@ import Layout from './components/layout/index';
 import ColaboradoresList from './pages/ColaboradoresList';
 import NovoColaborador from './pages/NovoColaborador';
 import EditarColaborador from './pages/EditarColaborador'; 
+import DepartamentosList from './pages/DepartamentosList'; // NOVO IMPORT
+import EditarDepartamento from './pages/EditarDepartamento';
+import NovoDepartamento from './pages/NovoDepartamento';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 
-const DepartamentosPlaceholder = () => <div>Página de Departamentos em construção...</div>;
 
 export default function App() {
   return (
@@ -23,12 +25,15 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          {/* Rotas de Colaboradores */}
           <Route path="/" element={<ColaboradoresList />} />
           <Route path="/novo" element={<NovoColaborador />} /> 
-          
           <Route path="/editar/:id" element={<EditarColaborador />} /> 
           
-          <Route path="/departamentos" element={<DepartamentosPlaceholder />} />
+          {/* Rotas de Departamentos */}
+          <Route path="/departamentos" element={<DepartamentosList />} />
+          <Route path="/departamentos/novo" element={<NovoDepartamento />} />
+          <Route path="/departamentos/editar/:id" element={<EditarDepartamento />} />
         </Route>
 
         <Route path="/404" element={<NotFound />} />

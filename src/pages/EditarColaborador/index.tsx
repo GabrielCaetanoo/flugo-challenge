@@ -8,6 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import CheckIcon from '@mui/icons-material/Check';
 
 import { updateEmployee, getEmployeeById, checkEmailExists } from '../../services/employeeService';
+import { getDepartments } from '../../services/departmentService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
@@ -25,10 +26,8 @@ const employeeSchema = z.object({
 
 type EmployeeFormData = z.infer<typeof employeeSchema>;
 
-interface Gestor {
-  id: string;
-  name: string;
-}
+interface Gestor { id: string; name: string; }
+interface DepartamentoLista { id: string; name: string; }
 
 const customInputStyle = {
   '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#20C975' },
@@ -37,39 +36,30 @@ const customInputStyle = {
 
 export default function EditarColaborador() {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>(); // Pega o ID da URL
+  const { id } = useParams<{ id: string }>(); 
   
   const [activeStep, setActiveStep] = useState(0);
   const [gestores, setGestores] = useState<Gestor[]>([]);
+  const [departamentos, setDepartamentos] = useState<DepartamentoLista[]>([]);
   const [loading, setLoading] = useState(true);
-  const [originalEmail, setOriginalEmail] = useState(''); // Guarda o e-mail original para validação
+  const [originalEmail, setOriginalEmail] = useState('');
 
   const methods = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: { 
-      name: '', email: '', isActive: true, department: '', cargo: '', dataAdmissao: '', nivel: '', gestorResponsavel: '', salario: ''
-    },
+    defaultValues: { name: '', email: '', isActive: true, department: '', cargo: '', dataAdmissao: '', nivel: '', gestorResponsavel: '', salario: '' },
     mode: 'onChange',
   });
 
   const { handleSubmit, trigger, setError, getValues, control, reset } = methods;
   
-  const nivelSelecionado = useWatch({
-    control,
-    name: 'nivel',
-    defaultValue: ''
-  });
+  const nivelSelecionado = useWatch({ control, name: 'nivel', defaultValue: '' });
 
-  // Busca os dados do colaborador E a lista de gestores
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (!id) return;
 
-        // 1. Busca os dados do colaborador 
         const employeeData = await getEmployeeById(id);
-        
-        // Preenche o formulário com os dados que vieram do banco
         reset({
           name: employeeData.name || '',
           email: employeeData.email || '',
@@ -83,18 +73,21 @@ export default function EditarColaborador() {
         });
         setOriginalEmail(employeeData.email || '');
 
-        // 2. Busca a lista de gestores
-        const q = query(collection(db, 'employees'), where('nivel', '==', 'Gestor')); // Lembre-se de checar o nome exato da coleção
-        const querySnapshot = await getDocs(q);
-        const lista = querySnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          name: doc.data().name 
-        }));
-        setGestores(lista);
+        const qGestores = query(collection(db, 'employees'), where('nivel', '==', 'Gestor'));
+        
+        const [querySnapshot, depsSnapshot] = await Promise.all([
+          getDocs(qGestores),
+          getDepartments()
+        ]);
+
+        const listaGestores = querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        setGestores(listaGestores);
+
+        const listaDeps = depsSnapshot.map(d => ({ id: d.id, name: d.name }));
+        setDepartamentos(listaDeps); 
 
       } catch (error) {
-        console.error("Erro ao buscar dados:", error);
-        alert("Não foi possível carregar os dados deste colaborador.");
+        console.error("Erro ao carregar dados:", error);
         navigate('/');
       } finally {
         setLoading(false);
@@ -105,11 +98,8 @@ export default function EditarColaborador() {
 
   const handleNext = async () => {
     const isStepValid = await trigger(['name', 'email']); 
-    
     if (isStepValid) {
       const currentEmail = getValues('email');
-      
-      // Só checa no banco se o usuário alterou o e-mail dele
       if (currentEmail !== originalEmail) {
         const emailAlreadyUsed = await checkEmailExists(currentEmail);
         if (emailAlreadyUsed) {
@@ -124,9 +114,15 @@ export default function EditarColaborador() {
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
   const onSubmit = async (data: EmployeeFormData) => {
+    // BLINDAGEM: Se tentar salvar na Etapa 0, ele cancela o salvamento e avança a tela!
+    if (activeStep === 0) {
+      handleNext();
+      return;
+    }
+
     try {
       if (!id) return;
-      await updateEmployee(id, data); // Função de atualização 
+      await updateEmployee(id, data);
       navigate('/'); 
     } catch (error) {
       console.error(error);
@@ -146,7 +142,6 @@ export default function EditarColaborador() {
 
   return (
     <Box sx={{ width: '100%', pr: 10 }}> 
-      
       <Typography variant="body2" sx={{ color: '#94A3B8', mb: 3, fontWeight: 500 }}>
         Colaboradores <Typography component="span" sx={{ color: '#94A3B8', mx: 1 }}>•</Typography> 
         <Typography component="span" sx={{ color: '#475569', fontWeight: 600 }}>Editar Colaborador</Typography>
@@ -158,17 +153,14 @@ export default function EditarColaborador() {
       </Box>
 
       <Box sx={{ display: 'flex', gap: 6 }}>
-        
         <Box sx={{ minWidth: 220, position: 'relative', pt: 0.5 }}>
           <Box sx={{ position: 'absolute', left: 15, top: 40, height: activeStep === 0 ? 105 : 25, width: '2px', bgcolor: '#E2E8F0', zIndex: 0 }} />
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: activeStep === 0 ? 15 : 5, position: 'relative', zIndex: 1 }}>
             <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14, bgcolor: activeStep >= 0 ? '#20C975' : '#E2E8F0', color: activeStep >= 0 ? '#FFFFFF' : '#64748B' }}>
               {activeStep > 0 ? <CheckIcon sx={{ fontSize: 20 }} /> : '1'}
             </Box>
             <Typography sx={{ color: activeStep >= 0 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 0 ? 700 : 500, fontSize: '15px' }}>Infos Básicas</Typography>
           </Box>
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
             <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14, bgcolor: activeStep >= 1 ? '#20C975' : '#E2E8F0', color: activeStep >= 1 ? '#FFFFFF' : '#64748B' }}>2</Box>
             <Typography sx={{ color: activeStep >= 1 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 1 ? 700 : 500, fontSize: '15px' }}>Infos Profissionais</Typography>
@@ -196,10 +188,12 @@ export default function EditarColaborador() {
                     <Box sx={{ gridColumn: 'span 12' }}>
                       <TextField select label="Departamento" variant="outlined" fullWidth InputLabelProps={{ shrink: true }} defaultValue="" {...methods.register('department')} error={!!methods.formState.errors.department} helperText={methods.formState.errors.department?.message} sx={customInputStyle} SelectProps={{ MenuProps: { disableScrollLock: true } }}>
                         <MenuItem value="" disabled>Selecione um departamento</MenuItem>
-                        <MenuItem value="Design">Design</MenuItem>
-                        <MenuItem value="TI">TI</MenuItem>
-                        <MenuItem value="Marketing">Marketing</MenuItem>
-                        <MenuItem value="Produto">Produto</MenuItem>
+                        
+                        <MenuItem value="A definir"><em>A definir / Diretoria</em></MenuItem>
+                        
+                        {departamentos.map((dep) => (
+                          <MenuItem key={dep.id} value={dep.name}>{dep.name}</MenuItem>
+                        ))}
                       </TextField>
                     </Box>
 
@@ -238,9 +232,9 @@ export default function EditarColaborador() {
               </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 6 }}>
-                <Button onClick={activeStep === 0 ? () => navigate('/') : handleBack} sx={{ color: '#94A3B8', fontWeight: 600, textTransform: 'none', fontSize: '15px' }}>Voltar</Button>
+                <Button type="button" onClick={activeStep === 0 ? () => navigate('/') : handleBack} sx={{ color: '#94A3B8', fontWeight: 600, textTransform: 'none', fontSize: '15px' }}>Voltar</Button>
                 {activeStep === 0 ? (
-                  <Button variant="contained" onClick={handleNext} disableElevation sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}>Próximo</Button>
+                  <Button type="button" variant="contained" onClick={(e) => { e.preventDefault(); handleNext(); }} disableElevation sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}>Próximo</Button>
                 ) : (
                   <Button type="submit" variant="contained" disableElevation sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}>Salvar Alterações</Button>
                 )}

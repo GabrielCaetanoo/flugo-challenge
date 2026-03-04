@@ -1,13 +1,14 @@
 // src/pages/NovoColaborador/index.tsx
 import { useState, useEffect } from 'react';
 import { Box, Typography, Button, LinearProgress, TextField, FormControlLabel, Switch, MenuItem } from '@mui/material';
-import { useForm, FormProvider, Controller, useWatch } from 'react-hook-form'; // Adicionado useWatch
+import { useForm, FormProvider, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useNavigate } from 'react-router-dom';
 import CheckIcon from '@mui/icons-material/Check';
 
 import { createEmployee, checkEmailExists } from '../../services/employeeService';
+import { getDepartments } from '../../services/departmentService'; // <-- NOVO IMPORT
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
@@ -25,10 +26,8 @@ const employeeSchema = z.object({
 
 type EmployeeFormData = z.infer<typeof employeeSchema>;
 
-interface Gestor {
-  id: string;
-  name: string;
-}
+interface Gestor { id: string; name: string; }
+interface DepartamentoLista { id: string; name: string; } // <-- NOVA INTERFACE
 
 const customInputStyle = {
   '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#20C975' },
@@ -38,27 +37,18 @@ const customInputStyle = {
 export default function NovoColaborador() {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
+  
   const [gestores, setGestores] = useState<Gestor[]>([]);
+  const [departamentos, setDepartamentos] = useState<DepartamentoLista[]>([]); // <-- NOVO ESTADO
 
   const methods = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: { 
-      name: '', 
-      email: '', 
-      isActive: true, 
-      department: '',
-      cargo: '',
-      dataAdmissao: '',
-      nivel: '',
-      gestorResponsavel: '',
-      salario: ''
-    },
+    defaultValues: { name: '', email: '', isActive: true, department: '', cargo: '', dataAdmissao: '', nivel: '', gestorResponsavel: '', salario: '' },
     mode: 'onChange',
   });
 
   const { handleSubmit, trigger, setError, getValues, control } = methods;
   
-  // SOLUÇÃO DO REACT COMPILER: Usando useWatch em vez de watch()
   const nivelSelecionado = useWatch({
     control,
     name: 'nivel',
@@ -66,22 +56,27 @@ export default function NovoColaborador() {
   });
 
   useEffect(() => {
-    const fetchGestores = async () => {
+    const fetchData = async () => {
       try {
-        const q = query(collection(db, 'colaboradores'), where('nivel', '==', 'Gestor'));
-        const querySnapshot = await getDocs(q);
+        // Busca lista de Gestores E lista de Departamentos ao mesmo tempo
+        const qGestores = query(collection(db, 'employees'), where('nivel', '==', 'Gestor'));
         
-        const lista = querySnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          name: doc.data().name 
-        }));
+        const [gestoresSnapshot, depsSnapshot] = await Promise.all([
+          getDocs(qGestores),
+          getDepartments() // <-- BUSCANDO DEPARTAMENTOS DO FIREBASE
+        ]);
         
-        setGestores(lista);
+        const listaGestores = gestoresSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        setGestores(listaGestores);
+
+        const listaDeps = depsSnapshot.map(d => ({ id: d.id, name: d.name }));
+        setDepartamentos(listaDeps); // <-- SALVANDO NO ESTADO
+
       } catch (error) {
-        console.error("Erro ao buscar gestores:", error);
+        console.error("Erro ao buscar dados iniciais:", error);
       }
     };
-    fetchGestores();
+    fetchData();
   }, []);
 
   const handleNext = async () => {
@@ -120,11 +115,7 @@ export default function NovoColaborador() {
       </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 6, width: 'calc(100% - 10px)' }}>
-        <LinearProgress 
-          variant="determinate" 
-          value={progress} 
-          sx={{ flexGrow: 1, height: 4, borderRadius: 2, bgcolor: '#D1FAE5', '& .MuiLinearProgress-bar': { bgcolor: '#20C975' } }} 
-        />
+        <LinearProgress variant="determinate" value={progress} sx={{ flexGrow: 1, height: 4, borderRadius: 2, bgcolor: '#D1FAE5', '& .MuiLinearProgress-bar': { bgcolor: '#20C975' } }} />
         <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600, minWidth: '30px' }}>{progress}%</Typography>
       </Box>
 
@@ -134,23 +125,15 @@ export default function NovoColaborador() {
           <Box sx={{ position: 'absolute', left: 15, top: 40, height: activeStep === 0 ? 105 : 25, width: '2px', bgcolor: '#E2E8F0', zIndex: 0 }} />
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: activeStep === 0 ? 15 : 5, position: 'relative', zIndex: 1 }}>
-            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14,
-                bgcolor: activeStep >= 0 ? '#20C975' : '#E2E8F0', color: activeStep >= 0 ? '#FFFFFF' : '#64748B' }}>
+            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14, bgcolor: activeStep >= 0 ? '#20C975' : '#E2E8F0', color: activeStep >= 0 ? '#FFFFFF' : '#64748B' }}>
               {activeStep > 0 ? <CheckIcon sx={{ fontSize: 20 }} /> : '1'}
             </Box>
-            <Typography sx={{ color: activeStep >= 0 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 0 ? 700 : 500, fontSize: '15px' }}>
-              Infos Básicas
-            </Typography>
+            <Typography sx={{ color: activeStep >= 0 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 0 ? 700 : 500, fontSize: '15px' }}>Infos Básicas</Typography>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative', zIndex: 1 }}>
-            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14,
-                bgcolor: activeStep >= 1 ? '#20C975' : '#E2E8F0', color: activeStep >= 1 ? '#FFFFFF' : '#64748B' }}>
-              2
-            </Box>
-            <Typography sx={{ color: activeStep >= 1 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 1 ? 700 : 500, fontSize: '15px' }}>
-              Infos Profissionais
-            </Typography>
+            <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14, bgcolor: activeStep >= 1 ? '#20C975' : '#E2E8F0', color: activeStep >= 1 ? '#FFFFFF' : '#64748B' }}>2</Box>
+            <Typography sx={{ color: activeStep >= 1 ? '#1E293B' : '#64748B', fontWeight: activeStep >= 1 ? 700 : 500, fontSize: '15px' }}>Infos Profissionais</Typography>
           </Box>
         </Box>
 
@@ -164,115 +147,39 @@ export default function NovoColaborador() {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, minHeight: 220 }}>
                 {activeStep === 0 && (
                   <>
-                    <TextField 
-                      label="Título" 
-                      placeholder="João da Silva" 
-                      variant="outlined" 
-                      fullWidth 
-                      InputLabelProps={{ shrink: true }}
-                      {...methods.register('name')} 
-                      error={!!methods.formState.errors.name} 
-                      helperText={methods.formState.errors.name?.message}
-                      sx={customInputStyle}
-                    />
-                    
-                    <TextField 
-                      label="E-mail" 
-                      placeholder="e.g. john@gmail.com" 
-                      variant="outlined" 
-                      fullWidth 
-                      InputLabelProps={{ shrink: true }}
-                      {...methods.register('email')} 
-                      error={!!methods.formState.errors.email} 
-                      helperText={methods.formState.errors.email?.message}
-                      sx={customInputStyle}
-                    />
-                    
-                    <Controller 
-                      name="isActive" 
-                      control={methods.control} 
-                      render={({ field }) => (
-                        <FormControlLabel 
-                          control={
-                            <Switch 
-                              {...field} 
-                              checked={field.value} 
-                              sx={{ 
-                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#20C975' }, 
-                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#20C975' } 
-                              }} 
-                            />
-                          } 
-                          label={<Typography sx={{ color: '#475569', fontWeight: 500, fontSize: '14px' }}>Ativar ao criar</Typography>} 
-                        />
-                      )}
-                    />
+                    <TextField label="Título" placeholder="João da Silva" variant="outlined" fullWidth InputLabelProps={{ shrink: true }} {...methods.register('name')} error={!!methods.formState.errors.name} helperText={methods.formState.errors.name?.message} sx={customInputStyle} />
+                    <TextField label="E-mail" placeholder="e.g. john@gmail.com" variant="outlined" fullWidth InputLabelProps={{ shrink: true }} {...methods.register('email')} error={!!methods.formState.errors.email} helperText={methods.formState.errors.email?.message} sx={customInputStyle} />
+                    <Controller name="isActive" control={methods.control} render={({ field }) => ( <FormControlLabel control={ <Switch {...field} checked={field.value} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#20C975' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#20C975' } }} /> } label={<Typography sx={{ color: '#475569', fontWeight: 500, fontSize: '14px' }}>Ativar ao criar</Typography>} /> )} />
                   </>
                 )}
 
                 {activeStep === 1 && (
-                  // SOLUÇÃO DO GRID: Usando Box com CSS Grid (100% seguro contra erros de versão do MUI)
                   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3 }}>
                     <Box sx={{ gridColumn: 'span 12' }}>
-                      <TextField 
-                        select 
-                        label="Departamento" 
-                        variant="outlined" 
-                        fullWidth 
-                        InputLabelProps={{ shrink: true }} 
-                        defaultValue=""
-                        {...methods.register('department')} 
-                        error={!!methods.formState.errors.department} 
-                        helperText={methods.formState.errors.department?.message}
-                        sx={customInputStyle}
-                        SelectProps={{ MenuProps: { disableScrollLock: true } }} 
-                      >
-                        <MenuItem value="" disabled>Selecione um departamento</MenuItem>
-                        <MenuItem value="Design">Design</MenuItem>
-                        <MenuItem value="TI">TI</MenuItem>
-                        <MenuItem value="Marketing">Marketing</MenuItem>
-                        <MenuItem value="Produto">Produto</MenuItem>
-                      </TextField>
+                      <TextField select label="Departamento" variant="outlined" fullWidth InputLabelProps={{ shrink: true }} defaultValue="" {...methods.register('department')} error={!!methods.formState.errors.department} helperText={methods.formState.errors.department?.message} sx={customInputStyle} SelectProps={{ MenuProps: { disableScrollLock: true } }}>
+
+                      <MenuItem value="" disabled>Selecione um departamento</MenuItem>
+  
+                      {/* A NOSSA VÁLVULA DE ESCAPE AQUI 👇 */}
+                      <MenuItem value="A definir"><em>A definir / Diretoria</em></MenuItem>
+  
+                      {/* NOVO: Renderiza a lista de departamentos vindos do Firebase */}
+                      {departamentos.map((dep) => (
+                        <MenuItem key={dep.id} value={dep.name}>{dep.name}</MenuItem>
+                      ))}
+                    </TextField>
                     </Box>
 
                     <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
-                      <TextField 
-                        label="Cargo" 
-                        fullWidth 
-                        InputLabelProps={{ shrink: true }} 
-                        {...methods.register('cargo')} 
-                        error={!!methods.formState.errors.cargo} 
-                        helperText={methods.formState.errors.cargo?.message} 
-                        sx={customInputStyle} 
-                      />
+                      <TextField label="Cargo" fullWidth InputLabelProps={{ shrink: true }} {...methods.register('cargo')} error={!!methods.formState.errors.cargo} helperText={methods.formState.errors.cargo?.message} sx={customInputStyle} />
                     </Box>
 
                     <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
-                      <TextField 
-                        label="Data de Admissão" 
-                        type="date" 
-                        fullWidth 
-                        InputLabelProps={{ shrink: true }} 
-                        {...methods.register('dataAdmissao')} 
-                        error={!!methods.formState.errors.dataAdmissao} 
-                        helperText={methods.formState.errors.dataAdmissao?.message} 
-                        sx={customInputStyle} 
-                      />
+                      <TextField label="Data de Admissão" type="date" fullWidth InputLabelProps={{ shrink: true }} {...methods.register('dataAdmissao')} error={!!methods.formState.errors.dataAdmissao} helperText={methods.formState.errors.dataAdmissao?.message} sx={customInputStyle} />
                     </Box>
 
                     <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
-                      <TextField 
-                        select 
-                        label="Nível Hierárquico" 
-                        fullWidth 
-                        defaultValue="" 
-                        InputLabelProps={{ shrink: true }} 
-                        {...methods.register('nivel')} 
-                        error={!!methods.formState.errors.nivel} 
-                        helperText={methods.formState.errors.nivel?.message} 
-                        sx={customInputStyle}
-                        SelectProps={{ MenuProps: { disableScrollLock: true } }}
-                      >
+                      <TextField select label="Nível Hierárquico" fullWidth defaultValue="" InputLabelProps={{ shrink: true }} {...methods.register('nivel')} error={!!methods.formState.errors.nivel} helperText={methods.formState.errors.nivel?.message} sx={customInputStyle} SelectProps={{ MenuProps: { disableScrollLock: true } }}>
                         <MenuItem value="" disabled>Selecione</MenuItem>
                         <MenuItem value="Júnior">Júnior</MenuItem>
                         <MenuItem value="Pleno">Pleno</MenuItem>
@@ -282,19 +189,7 @@ export default function NovoColaborador() {
                     </Box>
 
                     <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
-                      <TextField 
-                        select 
-                        label="Gestor Responsável" 
-                        fullWidth 
-                        defaultValue="" 
-                        InputLabelProps={{ shrink: true }} 
-                        {...methods.register('gestorResponsavel')} 
-                        error={!!methods.formState.errors.gestorResponsavel} 
-                        helperText={methods.formState.errors.gestorResponsavel?.message} 
-                        sx={customInputStyle} 
-                        disabled={nivelSelecionado === 'Gestor'}
-                        SelectProps={{ MenuProps: { disableScrollLock: true } }}
-                      >
+                      <TextField select label="Gestor Responsável" fullWidth defaultValue="" InputLabelProps={{ shrink: true }} {...methods.register('gestorResponsavel')} error={!!methods.formState.errors.gestorResponsavel} helperText={methods.formState.errors.gestorResponsavel?.message} sx={customInputStyle} disabled={nivelSelecionado === 'Gestor'} SelectProps={{ MenuProps: { disableScrollLock: true } }}>
                         <MenuItem value=""><em>Nenhum</em></MenuItem>
                         {gestores.map((gestor) => (
                           <MenuItem key={gestor.id} value={gestor.id}>{gestor.name}</MenuItem>
@@ -303,47 +198,19 @@ export default function NovoColaborador() {
                     </Box>
 
                     <Box sx={{ gridColumn: 'span 12' }}>
-                      <TextField 
-                        label="Salário Base (R$)" 
-                        type="number" 
-                        fullWidth 
-                        InputLabelProps={{ shrink: true }} 
-                        {...methods.register('salario')} 
-                        error={!!methods.formState.errors.salario} 
-                        helperText={methods.formState.errors.salario?.message} 
-                        sx={customInputStyle} 
-                      />
+                      <TextField label="Salário Base (R$)" type="number" fullWidth InputLabelProps={{ shrink: true }} {...methods.register('salario')} error={!!methods.formState.errors.salario} helperText={methods.formState.errors.salario?.message} sx={customInputStyle} />
                     </Box>
                   </Box>
                 )}
               </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 6 }}>
-                <Button 
-                  onClick={activeStep === 0 ? () => navigate('/') : handleBack} 
-                  sx={{ color: '#94A3B8', fontWeight: 600, textTransform: 'none', fontSize: '15px' }}
-                >
-                  Voltar
-                </Button>
+                <Button onClick={activeStep === 0 ? () => navigate('/') : handleBack} sx={{ color: '#94A3B8', fontWeight: 600, textTransform: 'none', fontSize: '15px' }}>Voltar</Button>
                 
                 {activeStep === 0 ? (
-                  <Button 
-                    variant="contained" 
-                    onClick={handleNext} 
-                    disableElevation 
-                    sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}
-                  >
-                    Próximo
-                  </Button>
+                  <Button variant="contained" onClick={handleNext} disableElevation sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}>Próximo</Button>
                 ) : (
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    disableElevation 
-                    sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}
-                  >
-                    Concluir
-                  </Button>
+                  <Button type="submit" variant="contained" disableElevation sx={{ bgcolor: '#20C975', color: '#FFFFFF', '&:hover': { bgcolor: '#1BA862' }, fontWeight: 600, px: 4, py: 1, borderRadius: '8px', textTransform: 'none', fontSize: '15px' }}>Concluir</Button>
                 )}
               </Box>
             </form>
