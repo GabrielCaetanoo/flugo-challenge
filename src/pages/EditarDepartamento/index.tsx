@@ -109,7 +109,7 @@ interface DepartmentFormProps {
 
 function DepartmentForm({ methods, managers, onCancel }: DepartmentFormProps) {
   return (
-    <form onSubmit={methods.handleSubmit(() => {})}>
+    <Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3 }}>
         <Box sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
           <TextField
@@ -168,7 +168,7 @@ function DepartmentForm({ methods, managers, onCancel }: DepartmentFormProps) {
           Salvar Alterações
         </Button>
       </Box>
-    </form>
+    </Box>
   );
 }
 
