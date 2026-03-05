@@ -1,75 +1,71 @@
 // src/services/departmentService.ts
-import { collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from './firebase';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DepartmentData {
   name: string;
-  gestorResponsavel: string; // Vai armazenar o ID do colaborador que é o Gestor
+  gestorResponsavel: string;
   descricao?: string;
 }
 
-const departmentsCollectionRef = collection(db, "departments");
+export type DepartmentWithId = DepartmentData & { id: string };
 
-// 1. Criar Departamento
-export const createDepartment = async (data: DepartmentData) => {
+// ─── Collection Reference ─────────────────────────────────────────────────────
+
+const departmentsRef = collection(db, 'departments');
+
+// ─── Service Functions ────────────────────────────────────────────────────────
+
+export const createDepartment = async (data: DepartmentData): Promise<string> => {
   try {
-    const docRef = await addDoc(departmentsCollectionRef, data);
+    const docRef = await addDoc(departmentsRef, data);
     return docRef.id;
   } catch (error) {
-    console.error("Erro ao criar departamento:", error);
+    console.error('Erro ao criar departamento:', error);
     throw error;
   }
 };
 
-// 2. Listar todos os Departamentos
-export const getDepartments = async () => {
+export const getDepartments = async (): Promise<DepartmentWithId[]> => {
   try {
-    const data = await getDocs(departmentsCollectionRef);
-    return data.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data()
-    })) as (DepartmentData & { id: string })[];
+    const snapshot = await getDocs(departmentsRef);
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as DepartmentWithId));
   } catch (error) {
-    console.error("Erro ao buscar departamentos:", error);
+    console.error('Erro ao buscar departamentos:', error);
     throw error;
   }
 };
 
-// 3. Buscar Departamento específico por ID (Para a tela de Edição)
-export const getDepartmentById = async (id: string) => {
+export const getDepartmentById = async (id: string): Promise<DepartmentData> => {
   try {
-    const docRef = doc(db, "departments", id);
+    const docRef = doc(db, 'departments', id);
     const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return docSnap.data() as DepartmentData;
-    } else {
-      throw new Error("Departamento não encontrado");
-    }
+
+    if (!docSnap.exists()) throw new Error('Departamento não encontrado');
+
+    return docSnap.data() as DepartmentData;
   } catch (error) {
-    console.error("Erro ao buscar departamento:", error);
+    console.error('Erro ao buscar departamento:', error);
     throw error;
   }
 };
 
-// 4. Atualizar Departamento
-export const updateDepartment = async (id: string, data: Partial<DepartmentData>) => {
+export const updateDepartment = async (id: string, data: Partial<DepartmentData>): Promise<void> => {
   try {
-    const docRef = doc(db, "departments", id);
-    await updateDoc(docRef, data);
+    await updateDoc(doc(db, 'departments', id), data);
   } catch (error) {
-    console.error("Erro ao atualizar departamento:", error);
+    console.error('Erro ao atualizar departamento:', error);
     throw error;
   }
 };
 
-// 5. Excluir Departamento (A regra de transferência de funcionários vai entrar em ação antes de chamar isso aqui!)
-export const deleteDepartment = async (id: string) => {
+export const deleteDepartment = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, "departments", id);
-    await deleteDoc(docRef);
+    await deleteDoc(doc(db, 'departments', id));
   } catch (error) {
-    console.error("Erro ao excluir departamento:", error);
+    console.error('Erro ao excluir departamento:', error);
     throw error;
   }
 };
